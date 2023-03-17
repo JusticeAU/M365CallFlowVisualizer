@@ -133,24 +133,29 @@ function Get-AutoAttendantDirectorySearchConfig {
         switch ($CalLFlowType) {
             defaultCallFlow {
 
+                if($SimpleAutoAttendants -eq $false)
+                {
                 $mermaidCode += "defaultCallFlowMenuOptions$($aaDefaultCallFlowAaObjectId) -.-> defaultCallFlowDirectorySearch$($aaDefaultCallFlowAaObjectId)[(Directory Search Methods:<br>$currentCallFlowDirectorySearchType $directoryLookupScope)]"
-
                 $allMermaidNodes += "defaultCallFlowDirectorySearch$($aaDefaultCallFlowAaObjectId)"
-            
+                }
             }
             afterHoursCallFlow {
-
+                
+                if($SimpleAutoAttendants -eq $false)
+                {
                 $mermaidCode += "afterHoursCallFlowMenuOptions$($aaAfterHoursCallFlowAaObjectId) -.-> afterHoursCallFlowDirectorySearch$($aaAfterHoursCallFlowAaObjectId)[(Directory Search Methods:<br>$currentCallFlowDirectorySearchType $directoryLookupScope)]"
 
                 $allMermaidNodes += "afterHoursCallFlowDirectorySearch$($aaAfterHoursCallFlowAaObjectId)"
-            
+                }
             }
             holidayCallFlow {
 
+                if($SimpleAutoAttendants -eq $false)
+                {
                 $mermaidCode += "holidayCallFlowMenuOptions$($aaHolidayCallFlowId) -.-> holidayCallFlowDirectorySearch$($aaHolidayCallFlowId)[(Directory Search Methods:<br>$currentCallFlowDirectorySearchType $directoryLookupScope)]"
 
                 $allMermaidNodes += "holidayCallFlowDirectorySearch$($aaHolidayCallFlowId)"
-
+                }
             }
             Default {}
         }

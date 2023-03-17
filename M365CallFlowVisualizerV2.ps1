@@ -68,6 +68,24 @@
         Type:               boolean
         Default value:      true
 
+    -ShowCallQueueAgentList
+        Specifies whether or not to also display the members of call queues. If set to false, only the names of the groups (if any) are shown.
+        Required:           false
+        Type:               boolean
+        Default value:      true
+
+    -SimpleQueues
+        Specifies whether or not to simplfy queue representation with only showing Queue name and timeout path.
+        Required:           false
+        Type:               boolean
+        Default value:      false
+
+    -SimpleAutoAttendants
+        Specifies whether or not to simplfy AutoAttendant representation with only showing AA name and IVR options if any. Hides Holiday and Business Hour Routing.
+        Required:           false
+        Type:               boolean
+        Default value:      false
+
     -ShowNestedHolidayCallFlows
         Specifies whether or not to also display the call flows of nested call queues or auto attendants of holiday call handlings. Call flows will be expanded and linked to the holiday subgraph. To use this parameter, -ShowNestedCallFlows must be true.
         Required:           false
@@ -276,6 +294,9 @@ param(
     [Parameter(Mandatory=$false)][Bool]$CacheResults = $false,
     [Parameter(Mandatory=$false)][String]$CustomFilePath = ".\Output\$(Get-Date -Format "yyyy-MM-dd")",
     [Parameter(Mandatory=$false)][Bool]$ShowNestedCallFlows = $true,
+    [Parameter(Mandatory=$false)][Bool]$ShowCallQueueAgentList = $true,
+    [Parameter(Mandatory=$false)][Bool]$SimpleQueues = $false,
+    [Parameter(Mandatory=$false)][Bool]$SimpleAutoAttendants = $false,
     [Parameter(Mandatory=$false)][Bool]$ShowUserCallingSettings = $true,
     [Parameter(Mandatory=$false)][Bool]$ShowNestedHolidayCallFlows = $false,
     [Parameter(Mandatory=$false)][Bool]$ShowNestedHolidayIVRs = $false,
@@ -680,6 +701,7 @@ function Get-AutoAttendantHolidaysAndAfterHours {
 
     $aa.Name = Optimize-DisplayName -String $aa.Name
 
+    
     if ($aaHasHolidays -eq $true) {
 
         $holidaySubgraphName = "subgraphHolidays$($aa.Identity)[Holidays $($aa.Name)]"
@@ -1556,7 +1578,7 @@ function Get-AutoAttendantDefaultCallFlow {
                 $audioFileName = $null
     
                 $defaultCallFlowMenuOptionsTTSGreetingValueExport = $defaultCallFlow.Menu.Prompts.TextToSpeechPrompt
-                $defaultCallFlowMenuOptionsTTSGreetingValue = Optimize-DisplayName -String $defaultCallFlow.Menu.Prompts.TextToSpeechPrompt
+                $defaultCallFlowMenuOptionsTTSGreetingValue = Optimize-DisplayName -String $defaultCallFlow.Menu.Psrompts.TextToSpeechPrompt
 
                 if ($ExportTTSGreetings) {
 
@@ -1629,6 +1651,9 @@ function Get-AutoAttendantDefaultCallFlow {
 
             }
 
+            if($SimpleAutoAttendants -eq $false)
+            {
+
             $defaultCallFlowMenuOptionsKeyPress = @"
 
 defaultCallFlowMenuOptions$($aaDefaultCallFlowAaObjectId){Key Press$defaultCallFlowVoiceResponse}
@@ -1645,6 +1670,27 @@ defaultCallFlowGreeting$($aaDefaultCallFlowAaObjectId)>$defaultCallFlowGreeting]
 
             $allMermaidNodes += @("defaultCallFlowMenuOptions$($aaDefaultCallFlowAaObjectId)","defaultCallFlowGreeting$($aaDefaultCallFlowAaObjectId)","defaultCallFlowMenuOptionsGreeting$($aaDefaultCallFlowAaObjectId)")
 
+            }
+            else
+            {
+
+            $defaultCallFlowMenuOptionsKeyPress = @"
+
+defaultCallFlowMenuOptions$($aaDefaultCallFlowAaObjectId){Key Press$defaultCallFlowVoiceResponse}
+"@
+
+            $mdDefaultCallFlowGreeting =@"
+$defaultCallFlowMenuOptionsKeyPress
+
+"@
+
+            $mdAutoAttendantDefaultCallFlowMenuOptions =@"
+
+"@
+
+            $allMermaidNodes += @("defaultCallFlowMenuOptions$($aaDefaultCallFlowAaObjectId)","defaultCallFlowGreeting$($aaDefaultCallFlowAaObjectId)","defaultCallFlowMenuOptionsGreeting$($aaDefaultCallFlowAaObjectId)")
+
+            }
         }
 
         $defaultCallFlowSharedVoicemailCounter = 1
@@ -2106,8 +2152,15 @@ defaultCallFlowGreeting$($aaDefaultCallFlowAaObjectId)>$defaultCallFlowGreeting]
 
                     $MatchingCQIdentity = ($allCallQueues | Where-Object {$_.ApplicationInstances -contains $MenuOption.CallTarget.Id}).Identity
 
-                    $mdAutoAttendantDefaultCallFlow = "$mdDtmfLink defaultCallFlow$($aaDefaultCallFlowAaObjectId)$DtmfKey($defaultCallFlowAction) --> $($MatchingCQIdentity)($defaultCallFlowTargetTypeFriendly <br> $defaultCallFlowTargetName)`n"
-                    
+                    if($SimpleAutoAttendants -eq $true)
+                    {
+                        $mdAutoAttendantDefaultCallFlow = "$mdDtmfLink $($MatchingCQIdentity)($defaultCallFlowTargetTypeFriendly <br> $defaultCallFlowTargetName)`n"
+                    }
+                    else
+                    {
+                        $mdAutoAttendantDefaultCallFlow = "$mdDtmfLink defaultCallFlow$($aaDefaultCallFlowAaObjectId)$DtmfKey($defaultCallFlowAction) --> $($MatchingCQIdentity)($defaultCallFlowTargetTypeFriendly <br> $defaultCallFlowTargetName)`n"
+                    }
+
                     if ($nestedVoiceApps -notcontains $MatchingCQIdentity) {
 
                         $nestedVoiceApps += $MatchingCQIdentity
@@ -3167,9 +3220,12 @@ function Get-CallQueueCallFlow {
                     $nestedVoiceApps += $MatchingOverFlowUserProperties.Id
 
                 }
-
-                $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowIdentity)(User <br> $MatchingOverFlowUser)"
-
+                if($SimpleQueues -eq $true){
+                    $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)$($MatchingOverFlowIdentity)(User <br> $MatchingOverFlowUser)"
+                }
+                else{
+                    $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowIdentity)(User <br> $MatchingOverFlowUser)"
+                }
                 $allMermaidNodes += @("cqOverFlowAction$($cqCallFlowObjectId)","$($MatchingOverFlowIdentity)")
 
             }
@@ -3183,9 +3239,12 @@ function Get-CallQueueCallFlow {
                     $cqOverFlowPhoneNumber = $cqOverFlowPhoneNumber.Remove(($cqOverFlowPhoneNumber.Length -4)) + "****"
 
                 }        
-
-                $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($cqOverFlowPhoneNumber)(External Number <br> $cqOverFlowPhoneNumber)"
-
+                if($SimpleQueues -eq $true){
+                    $CqOverFlowActionFriendly = "cqOverFlowAction$($cqOverFlowPhoneNumber)(External Number <br> $cqOverFlowPhoneNumber)"
+                }
+                else{
+                    $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($cqOverFlowPhoneNumber)(External Number <br> $cqOverFlowPhoneNumber)"
+                }
                 $allMermaidNodes += @("cqOverFlowAction$($cqCallFlowObjectId)","$($cqOverFlowPhoneNumber)")
                 
             }
@@ -3199,7 +3258,13 @@ function Get-CallQueueCallFlow {
                     $MatchingOverFlowAA = ($allAutoAttendants | Where-Object {$_.ApplicationInstances -contains $MatchingCQ.OverflowActionTarget.Id})
 
                     $MatchingOverFlowAA.Name = Optimize-DisplayName -String $MatchingOverFlowAA.Name
-                    $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowAA.Identity)([Auto Attendant <br> $($MatchingOverFlowAA.Name)])"
+                    
+                    if($SimpleQueues -eq $true){
+                        $CqOverFlowActionFriendly = "cqOverFlowAction$($MatchingOverFlowAA.Identity)([Auto Attendant <br> $($MatchingOverFlowAA.Name)])"
+                    }
+                    else{
+                        $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowAA.Identity)([Auto Attendant <br> $($MatchingOverFlowAA.Name)])"
+                    }
 
                     if ($nestedVoiceApps -notcontains $MatchingOverFlowAA.Identity -and $MatchingCQ.TimeoutThreshold -ge 1) {
 
@@ -3218,7 +3283,12 @@ function Get-CallQueueCallFlow {
 
                     $MatchingOverFlowCQ.Name = Optimize-DisplayName -String $MatchingOverFlowCQ.Name
 
-                    $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowCQ.Identity)([Call Queue <br> $($MatchingOverFlowCQ.Name)])"
+                    if($SimpleQueues -eq $true){
+                        $CqOverFlowActionFriendly = "cqOverFlowAction$($MatchingOverFlowCQ.Identity)([Call Queue <br> $($MatchingOverFlowCQ.Name)])"
+                    }
+                    else{
+                        $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowCQ.Identity)([Call Queue <br> $($MatchingOverFlowCQ.Name)])"
+                    }
 
                     if ($nestedVoiceApps -notcontains $MatchingOverFlowCQ.Identity -and $MatchingCQ.TimeoutThreshold -ge 1) {
 
@@ -3244,7 +3314,12 @@ function Get-CallQueueCallFlow {
             
             }        
 
-            $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> cqPersonalVoicemail$($MatchingOverFlowPersonalVoicemailIdentity)(Personal Voicemail <br> $MatchingOverFlowPersonalVoicemailUser)"
+            if($SimpleQueues -eq $true) {
+                $CqOverFlowActionFriendly = "cqPersonalVoicemail$($MatchingOverFlowPersonalVoicemailIdentity)(Personal Voicemail <br> $MatchingOverFlowPersonalVoicemailUser)"
+            }
+            else{
+                $CqOverFlowActionFriendly = "cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> cqPersonalVoicemail$($MatchingOverFlowPersonalVoicemailIdentity)(Personal Voicemail <br> $MatchingOverFlowPersonalVoicemailUser)"
+            }
 
             $allMermaidNodes += @("cqOverFlowAction$($cqCallFlowObjectId)","$($MatchingOverFlowPersonalVoicemailIdentity)","cqPersonalVoicemail$($MatchingOverFlowPersonalVoicemailIdentity)")
         }
@@ -3406,8 +3481,12 @@ function Get-CallQueueCallFlow {
 
             }
 
-            $CqOverFlowActionFriendly = "cqOverFlowVoicemailGreeting$($cqCallFlowObjectId)>Greeting <br> $CqOverFlowVoicemailGreeting] $CQOverFlowVoicemailSystemGreeting--> cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowIdentity)(Shared Voicemail <br> $MatchingOverFlowVoicemail)"
-
+            if($SimpleQueues -eq $true){
+                $CqOverFlowActionFriendly = "cqOverFlowVoicemailGreeting$($MatchingOverFlowIdentity)(Shared Voicemail <br> $MatchingOverFlowVoicemail)"
+            }
+            else{
+                $CqOverFlowActionFriendly = "cqOverFlowVoicemailGreeting$($cqCallFlowObjectId)>Greeting <br> $CqOverFlowVoicemailGreeting] $CQOverFlowVoicemailSystemGreeting--> cqOverFlowAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingOverFlowIdentity)(Shared Voicemail <br> $MatchingOverFlowVoicemail)"
+            }
             $allMermaidNodes += @("cqOverFlowAction$($cqCallFlowObjectId)","cqOverFlowVoicemailGreeting$($cqCallFlowObjectId)","$($MatchingOverFlowIdentity)")
 
         }
@@ -3455,7 +3534,14 @@ function Get-CallQueueCallFlow {
 
                 }
     
-                $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingTimeoutIdentity)(User <br> $MatchingTimeoutUser)"
+                if($SimpleQueues -eq $true)
+                {
+                    $CqTimeoutActionFriendly = "$($MatchingTimeoutIdentity)(User <br> $MatchingTimeoutUser)"
+                }
+                else
+                {
+                    $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingTimeoutIdentity)(User <br> $MatchingTimeoutUser)"
+                }
 
                 $allMermaidNodes += @("cqTimeoutAction$($cqCallFlowObjectId)","$($MatchingTimeoutIdentity)")
     
@@ -3470,8 +3556,16 @@ function Get-CallQueueCallFlow {
                     $cqTimeoutPhoneNumber = $cqTimeoutPhoneNumber.Remove(($cqTimeoutPhoneNumber.Length -4)) + "****"
 
                 }
-    
-                $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($cqTimeoutPhoneNumber)(External Number <br> $cqTimeoutPhoneNumber)"
+                
+                if($SimpleQueues -eq $true)
+                {
+                    $CqTimeoutActionFriendly = "$($cqTimeoutPhoneNumber)(External Number <br> $cqTimeoutPhoneNumber)"
+                }
+                else
+                {
+                    $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($cqTimeoutPhoneNumber)(External Number <br> $cqTimeoutPhoneNumber)"
+                }
+
 
                 $allMermaidNodes += @("cqTimeoutAction$($cqCallFlowObjectId)","$($cqTimeoutPhoneNumber)")
                 
@@ -3487,7 +3581,14 @@ function Get-CallQueueCallFlow {
 
                     $MatchingTimeoutAA.Name = Optimize-DisplayName -String $MatchingTimeoutAA.Name
     
-                    $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingTimeoutAA.Identity)([Auto Attendant <br> $($MatchingTimeoutAA.Name)])"
+                    if($SimpleQueues -eq $true)
+                    {
+                        $CqTimeoutActionFriendly = "$($MatchingTimeoutAA.Identity)([Auto Attendant <br> $($MatchingTimeoutAA.Name)])"
+                    }
+                    else
+                    {
+                        $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingTimeoutAA.Identity)([Auto Attendant <br> $($MatchingTimeoutAA.Name)])"
+                    }
 
                     if ($nestedVoiceApps -notcontains $MatchingTimeoutAA.Identity -and $MatchingCQ.OverflowThreshold -ge 1) {
 
@@ -3505,7 +3606,14 @@ function Get-CallQueueCallFlow {
 
                     $MatchingTimeoutCQ.Name = Optimize-DisplayName -String $MatchingTimeoutCQ.Name
 
-                    $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingTimeoutCQ.Identity)([Call Queue <br> $($MatchingTimeoutCQ.Name)])"
+                    if($SimpleQueues -eq $true)
+                    {
+                        $CqTimeoutActionFriendly = "$($MatchingTimeoutCQ.Identity)([Call Queue <br> $($MatchingTimeoutCQ.Name)])"
+                    }
+                    else
+                    {
+                        $CqTimeoutActionFriendly = "cqTimeoutAction$($cqCallFlowObjectId)(TransferCallToTarget) --> $($MatchingTimeoutCQ.Identity)([Call Queue <br> $($MatchingTimeoutCQ.Name)])"
+                    }
 
                     if ($nestedVoiceApps -notcontains $MatchingTimeoutCQ.Identity -and $MatchingCQ.OverflowThreshold -ge 1) {
 
@@ -3697,144 +3805,154 @@ function Get-CallQueueCallFlow {
     
     }
 
-    # Create empty mermaid element for agent list
-    $mdCqAgentsDisplayNames = @"
+    if($ShowCallQueueAgentList -eq $true)
+    {
+        # Create empty mermaid element for agent list
+        $mdCqAgentsDisplayNames = @"
 "@
+    
+        # Define agent counter for unique mermaid element names
+        $AgentCounter = 1
 
-    # Define agent counter for unique mermaid element names
-    $AgentCounter = 1
+        # add each agent to the empty agents mermaid element
+        foreach ($CqAgent in $CqAgents) {
+            $AgentDisplayName = Optimize-DisplayName -String (Get-MgUser -UserId $CqAgent.ObjectId).DisplayName
 
-    # add each agent to the empty agents mermaid element
-    foreach ($CqAgent in $CqAgents) {
-        $AgentDisplayName = Optimize-DisplayName -String (Get-MgUser -UserId $CqAgent.ObjectId).DisplayName
+            if ($FindUserLinks -eq $true) {
+            
+                . New-VoiceAppUserLinkProperties -userLinkUserId $CqAgent.ObjectId -userLinkUserName $AgentDisplayName -userLinkVoiceAppType "Call Queue" -userLinkVoiceAppActionType "Agent" -userLinkVoiceAppName $MatchingCQ.Name -userLinkVoiceAppId $MatchingCQIdentity
+            
+            }
 
-        if ($FindUserLinks -eq $true) {
-         
-            . New-VoiceAppUserLinkProperties -userLinkUserId $CqAgent.ObjectId -userLinkUserName $AgentDisplayName -userLinkVoiceAppType "Call Queue" -userLinkVoiceAppActionType "Agent" -userLinkVoiceAppName $MatchingCQ.Name -userLinkVoiceAppId $MatchingCQIdentity
+            if ($ShowCqAgentPhoneNumbers -eq $true) {
+
+                $CqAgentPhoneNumber = ((Get-CsOnlineUser -Identity $($CqAgent.ObjectId)).LineUri)
+
+                if (!$CqAgentPhoneNumber) {
+
+                    $CqAgentPhoneNumber = "No Number Assigned"
+
+                }
+
+                else {
+
+                    if ($ShowPhoneNumberType -eq $true) {
+
+                        $CqAgentPhoneNumberType = (Get-CsPhoneNumberAssignment -TelephoneNumber $CqAgentPhoneNumber.Replace("tel:","")).NumberType
+                    
+                    }
+
+                    if ($CqAgentPhoneNumber -match "tel:") {
+
+                        $CqAgentPhoneNumber = $CqAgentPhoneNumber.Replace("tel:","")
         
-        }
+                    }
+        
+                    if ($CqAgentPhoneNumber -notmatch "\+") {
+        
+                        $CqAgentPhoneNumber = "+" + $CqAgentPhoneNumber
+        
+                    }
+        
+                }
 
-        if ($ShowCqAgentPhoneNumbers -eq $true) {
+                if ($ObfuscatePhoneNumbers -eq $true) {
 
-            $CqAgentPhoneNumber = ((Get-CsOnlineUser -Identity $($CqAgent.ObjectId)).LineUri)
+                    $CqAgentPhoneNumber = $CqAgentPhoneNumber.Remove(($CqAgentPhoneNumber.Length -4)) + "****"
 
-            if (!$CqAgentPhoneNumber) {
+                }
 
-                $CqAgentPhoneNumber = "No Number Assigned"
+                if ($ShowPhoneNumberType -eq $true) {
+
+                    $CqAgentPhoneNumber = $CqAgentPhoneNumber + "<br>$CqAgentPhoneNumberType"
+
+                }
+
+                $AgentDisplayName = "$AgentDisplayName <br> $CqAgentPhoneNumber"
+
+            }
+
+
+            if ($ShowCqAgentOptInStatus -eq $true) {
+
+                $AgentDisplayName = "$AgentDisplayName <br> OptIn: $($CqAgent.OptIn)"
+
+            }
+
+            if ($CqRoutingMethod -eq "Serial") {
+
+                $serialAgentNumber = "|$AgentCounter|"
 
             }
 
             else {
 
-                if ($ShowPhoneNumberType -eq $true) {
-
-                    $CqAgentPhoneNumberType = (Get-CsPhoneNumberAssignment -TelephoneNumber $CqAgentPhoneNumber.Replace("tel:","")).NumberType
-                
-                }
-
-                if ($CqAgentPhoneNumber -match "tel:") {
-
-                    $CqAgentPhoneNumber = $CqAgentPhoneNumber.Replace("tel:","")
-    
-                }
-    
-                if ($CqAgentPhoneNumber -notmatch "\+") {
-    
-                    $CqAgentPhoneNumber = "+" + $CqAgentPhoneNumber
-    
-                }
-    
-            }
-
-            if ($ObfuscatePhoneNumbers -eq $true) {
-
-                $CqAgentPhoneNumber = $CqAgentPhoneNumber.Remove(($CqAgentPhoneNumber.Length -4)) + "****"
+                $serialAgentNumber = $null
 
             }
 
-            if ($ShowPhoneNumberType -eq $true) {
+            $AgentDisplayNames = "agentListType$($cqCallFlowObjectId) -.-> $serialAgentNumber agent$($cqCallFlowObjectId)$($AgentCounter)($AgentDisplayName)`n"
 
-                $CqAgentPhoneNumber = $CqAgentPhoneNumber + "<br>$CqAgentPhoneNumberType"
+            $allMermaidNodes += @("agentListType$($cqCallFlowObjectId)","agent$($cqCallFlowObjectId)$($AgentCounter)")
 
-            }
+            $mdCqAgentsDisplayNames += $AgentDisplayNames
 
-            $AgentDisplayName = "$AgentDisplayName <br> $CqAgentPhoneNumber"
-
-        }
-
-
-        if ($ShowCqAgentOptInStatus -eq $true) {
-
-            $AgentDisplayName = "$AgentDisplayName <br> OptIn: $($CqAgent.OptIn)"
+            $AgentCounter ++
 
         }
 
-        if ($CqRoutingMethod -eq "Serial") {
+        $allMermaidNodes += "$($MatchingCQIdentity)"
 
-            $serialAgentNumber = "|$AgentCounter|"
+        # Add outbound calling IDs if available and if selected
+        if ($ShowCqOutboundCallingIds -eq $true) {
 
-        }
+            if ($CqOboResourceAccountIds) {
 
-        else {
+                $oboResourceAccounts = "Outbound Calling Ids:"
 
-            $serialAgentNumber = $null
+                foreach ($CqOboResourceAccountId in $CqOboResourceAccountIds) {
 
-        }
+                    $oboResourceAccount = $allResourceAccounts | Where-Object {$_.ObjectId -eq $CqOboResourceAccountId}
+                    $oboResourceAccountDisplayName = Optimize-DisplayName -String $oboResourceAccount.DisplayName
+                    $oboResourceAccountPhoneNumber = $oboResourceAccount.PhoneNumber.Replace("tel:","")
 
-        $AgentDisplayNames = "agentListType$($cqCallFlowObjectId) -.-> $serialAgentNumber agent$($cqCallFlowObjectId)$($AgentCounter)($AgentDisplayName)`n"
+                    if ($ShowPhoneNumberType -eq $true) {
 
-        $allMermaidNodes += @("agentListType$($cqCallFlowObjectId)","agent$($cqCallFlowObjectId)$($AgentCounter)")
+                        $oboResourceAccountPhoneNumberPhoneNumberType = (Get-CsPhoneNumberAssignment -TelephoneNumber $oboResourceAccount.PhoneNumber.Replace("tel:","")).NumberType
+                    
+                    }
 
-        $mdCqAgentsDisplayNames += $AgentDisplayNames
+                    if ($ObfuscatePhoneNumbers -eq $true) {
 
-        $AgentCounter ++
-
-    }
-
-    $allMermaidNodes += "$($MatchingCQIdentity)"
-
-    # Add outbound calling IDs if available and if selected
-    if ($ShowCqOutboundCallingIds -eq $true) {
-
-        if ($CqOboResourceAccountIds) {
-
-            $oboResourceAccounts = "Outbound Calling Ids:"
-
-            foreach ($CqOboResourceAccountId in $CqOboResourceAccountIds) {
-
-                $oboResourceAccount = $allResourceAccounts | Where-Object {$_.ObjectId -eq $CqOboResourceAccountId}
-                $oboResourceAccountDisplayName = Optimize-DisplayName -String $oboResourceAccount.DisplayName
-                $oboResourceAccountPhoneNumber = $oboResourceAccount.PhoneNumber.Replace("tel:","")
-
-                if ($ShowPhoneNumberType -eq $true) {
-
-                    $oboResourceAccountPhoneNumberPhoneNumberType = (Get-CsPhoneNumberAssignment -TelephoneNumber $oboResourceAccount.PhoneNumber.Replace("tel:","")).NumberType
-                
-                }
-
-                if ($ObfuscatePhoneNumbers -eq $true) {
-
-                    $oboResourceAccountPhoneNumber = $oboResourceAccountPhoneNumber.Remove(($oboResourceAccountPhoneNumber.Length -4)) + "****"
-    
-                }
-
-                if ($ShowPhoneNumberType -eq $true) {
-
-                    $oboResourceAccountPhoneNumber = $oboResourceAccountPhoneNumber + "<br>$oboResourceAccountPhoneNumberPhoneNumberType"
-
-                }
-    
-                $oboResourceAccounts += "<br>$oboResourceAccountDisplayName $oboResourceAccountPhoneNumber"
-
-            }
-
-            $mdOutboundCallingIds = @"
-
-            cqSettingsContainer$($cqCallFlowObjectId) -.- cqOutboundCallingIds$($cqCallFlowObjectId)[($($oboResourceAccounts))] -.- 
+                        $oboResourceAccountPhoneNumber = $oboResourceAccountPhoneNumber.Remove(($oboResourceAccountPhoneNumber.Length -4)) + "****"
         
+                    }
+
+                    if ($ShowPhoneNumberType -eq $true) {
+
+                        $oboResourceAccountPhoneNumber = $oboResourceAccountPhoneNumber + "<br>$oboResourceAccountPhoneNumberPhoneNumberType"
+
+                    }
+        
+                    $oboResourceAccounts += "<br>$oboResourceAccountDisplayName $oboResourceAccountPhoneNumber"
+
+                }
+
+                $mdOutboundCallingIds = @"
+
+                cqSettingsContainer$($cqCallFlowObjectId) -.- cqOutboundCallingIds$($cqCallFlowObjectId)[($($oboResourceAccounts))] -.- 
+            
 "@
-        
-            $allMermaidNodes += "cqOutboundCallingIds$($cqCallFlowObjectId)"
+            
+                $allMermaidNodes += "cqOutboundCallingIds$($cqCallFlowObjectId)"
+
+            }
+
+            else {
+
+                $mdOutboundCallingIds = "cqSettingsContainer$($cqCallFlowObjectId) -.- timeOut$($cqCallFlowObjectId)"
+
+            }
 
         }
 
@@ -3843,15 +3961,7 @@ function Get-CallQueueCallFlow {
             $mdOutboundCallingIds = "cqSettingsContainer$($cqCallFlowObjectId) -.- timeOut$($cqCallFlowObjectId)"
 
         }
-
     }
-
-    else {
-
-        $mdOutboundCallingIds = "cqSettingsContainer$($cqCallFlowObjectId) -.- timeOut$($cqCallFlowObjectId)"
-
-    }
-    
     # Create default callflow mermaid code
 
     if ($CombineCallConnectedNodes -eq $true) {
@@ -3870,6 +3980,15 @@ function Get-CallQueueCallFlow {
 
     }
 
+#Justin Edit for Simple Queues
+if($SimpleQueues -eq $true) {
+
+$mdCallQueueCallFlow =@"
+$($MatchingCQIdentity)([Call Queue <br> $($CqName)]) --> $CqTimeoutActionFriendly
+
+"@
+}
+else {
 $mdCallQueueCallFlow =@"
 $($MatchingCQIdentity)([Call Queue <br> $($CqName)]) -->$cqGreetingNode overFlow$($cqCallFlowObjectId){More than $CqOverFlowThreshold <br> Active Calls?}
 overFlow$($cqCallFlowObjectId) --> |Yes| $CqOverFlowActionFriendly
@@ -3895,7 +4014,7 @@ cqResult$($cqCallFlowObjectId) --> |Yes| $mdCallSuccess
 cqResult$($cqCallFlowObjectId) --> |No| timeOut$($cqCallFlowObjectId) --> $CqTimeoutActionFriendly
 
 "@
-
+}
     if ($mermaidCode -notcontains $mdCallQueueCallFlow) {
 
         if ($MatchingCQ.OverflowThreshold -ge 1 -and $MatchingCQ.TimeoutThreshold -ge 1) {
@@ -3933,6 +4052,7 @@ timeOut$($cqCallFlowObjectId) --> $CqTimeoutActionFriendly
     }
 
 }
+
 
 . Set-Mermaid -DocType $DocType
 
@@ -4232,7 +4352,30 @@ function Get-CallFlow {
         . Find-Holidays -VoiceAppId $VoiceApp.Identity
         . Find-AfterHours -VoiceAppId $VoiceApp.Identity
 
-        if ($aaHasHolidays -eq $true -and $aaHasAfterHours -eq $false) {
+        #JE Simple Auto Attendant edit starts here.
+        if($SimpleAutoAttendants){
+    
+            . Get-AutoAttendantDefaultCallFlow -VoiceAppId $VoiceApp.Identity
+
+            $aa.Name = Optimize-DisplayName -String $aa.Name
+
+            $nodeElementHolidayLink = "$($aa.Identity)([Auto Attendant <br> $($aa.Name)])"
+    
+            $mdHolidayAndAfterHoursCheck =@"
+            $nodeElementHolidayLink --> $mdAutoAttendantDefaultCallFlow
+            
+"@
+
+            $allMermaidNodes += "$($aa.Identity)"
+
+            if ($mermaidCode -notcontains $mdHolidayAndAfterHoursCheck) {
+
+                $mermaidCode += $mdHolidayAndAfterHoursCheck
+
+            }
+    
+        }
+        elseif ($aaHasHolidays -eq $true -and $aaHasAfterHours -eq $false) {
     
             . Get-AutoAttendantDefaultCallFlow -VoiceAppId $VoiceApp.Identity
         
